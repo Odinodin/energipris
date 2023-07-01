@@ -4,13 +4,14 @@ use reqwest;
 use reqwest::Response;
 use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE};
 use serde::{Deserialize, Serialize};
-
+use chrono::{DateTime};
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 struct Price {
     total: f32,
     energy: f32,
-    startsAt: String,
+    starts_at: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -22,14 +23,16 @@ struct PriceInfo {
 
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 struct Subscription {
-    priceInfo: PriceInfo,
+    price_info: PriceInfo,
 }
 
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 struct Home {
-    currentSubscription: Subscription,
+    current_subscription: Subscription,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -62,18 +65,22 @@ async fn main() {
     };
 
     //fetch_user(&token).await;
-    let priceResponse = fetch_prices(&token).await;
+    let price_response = fetch_prices(&token).await;
 
-    if priceResponse.is_some() {
-        let unwrapped = priceResponse.unwrap();
+    if price_response.is_some() {
+        let unwrapped = price_response.unwrap();
         let price = unwrapped.data.viewer.homes.get(0);
         if price.is_some() {
-            let price_info = &price.unwrap().currentSubscription.priceInfo;
+            let price_info = &price.unwrap().current_subscription.price_info;
 
             println!("Current price {}", &price_info.current.total);
 
+            println!("=============");
+            println!("=   TODAY   =");
+            println!("=============");
             for price in &price_info.today {
-                println!("{} : {}", price.startsAt, price.total)
+                // 2023-07-01T20:00:00.000+02:00
+                println!("{} : {}", DateTime::parse_from_rfc3339(price.starts_at.as_str()).unwrap().time(), price.total)
             }
         }
     }
