@@ -4,13 +4,14 @@ use reqwest;
 use reqwest::Response;
 use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE};
 use serde::{Deserialize, Serialize};
-use chrono::{DateTime};
 
-#[derive(Serialize, Deserialize, Debug)]
+use rasciigraph::{plot, Config};
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 struct Price {
-    total: f32,
-    energy: f32,
+    total: f64,
+    energy: f64,
     starts_at: String,
 }
 
@@ -21,13 +22,11 @@ struct PriceInfo {
     tomorrow: Vec<Price>,
 }
 
-
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 struct Subscription {
     price_info: PriceInfo,
 }
-
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -39,7 +38,6 @@ struct Home {
 struct PriceViewer {
     homes: Vec<Home>,
 }
-
 
 #[derive(Serialize, Deserialize, Debug)]
 struct UserViewer {
@@ -56,7 +54,6 @@ struct ApiResponse<T> {
     data: Data<T>,
 }
 
-// tokio let's us use "async" on our main function
 #[tokio::main]
 async fn main() {
     let token = match env::var_os("TIBBER_API_TOKEN") {
@@ -64,7 +61,6 @@ async fn main() {
         None => panic!("$TIBBER_API_TOKEN is not set")
     };
 
-    //fetch_user(&token).await;
     let price_response = fetch_prices(&token).await;
 
     if price_response.is_some() {
@@ -73,15 +69,22 @@ async fn main() {
         if price.is_some() {
             let price_info = &price.unwrap().current_subscription.price_info;
 
-            println!("Current price {}", &price_info.current.total);
+            println!("  Today (Current price {})", &price_info.current.total);
+            println!("");
 
-            println!("=============");
-            println!("=   TODAY   =");
-            println!("=============");
-            for price in &price_info.today {
-                // 2023-07-01T20:00:00.000+02:00
-                println!("{} : {}", DateTime::parse_from_rfc3339(price.starts_at.as_str()).unwrap().time(), price.total)
-            }
+            println!(
+                "{}",
+                plot(
+                    price_info.today.clone().iter().map(|p| p.total).collect(),
+                    Config::default()
+                        .with_width(24 * 4)
+                        .with_offset(0) // Where the y-axis starts
+                        .with_height(10),
+                )
+            );
+            // The graph library does not support x-axis, so this is a little hack
+            println!("       ‾|‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾|‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾|‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾|‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾|");
+            println!("       00:00                   06:00                   12:00                   18:00               24:00")
         }
     }
 }
@@ -124,40 +127,12 @@ async fn fetch_prices(token: &String) -> Option<ApiResponse<PriceViewer>> {
             let response_text = response.text().await.unwrap();
 
             match serde_json::from_str::<ApiResponse<PriceViewer>>(&response_text) {
-                Ok(parsed) => {
-                    //println!("{:?}", parsed);
-                    Some(parsed)
-                }
+                Ok(parsed) => Some(parsed),
                 Err(e) => {
-                    println!("FAILED TO PARSE! {:?}", e);
-                    println!("RESPONSE {:?}", response_text);
+                    println!("FAILED TO PARSE! {:?} {:?}", e, response_text);
                     None
                 }
             }
-        }
-        other => {
-            panic!("Uh oh! Something unexpected happened: {:?}", other);
-        }
-    };
-}
-
-async fn fetch_user(token: &String) {
-    let q = "{ viewer { name } }";
-
-    let response = query(&token, q).await;
-
-    return match response.status() {
-        reqwest::StatusCode::OK => {
-            match response.json::<ApiResponse<UserViewer>>().await {
-                Ok(parsed) => {
-                    println!("{:?}", parsed);
-                    Some(parsed)
-                }
-                Err(e) => {
-                    println!("FAILED TO PARSE! {:?}", e);
-                    None
-                }
-            };
         }
         other => {
             panic!("Uh oh! Something unexpected happened: {:?}", other);
