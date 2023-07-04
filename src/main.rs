@@ -5,7 +5,21 @@ use reqwest::Response;
 use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE};
 use serde::{Deserialize, Serialize};
 
+use clap::{Parser};
 use rasciigraph::{plot, Config};
+
+
+#[derive(Parser)]
+#[command(name = "energipriser")]
+#[command(author = "Odin Standal <odin@odinodin.com>")]
+#[command(version = "1.0")]
+#[command(about = "Henter energipriser", long_about = None)]
+struct Cli {
+    #[arg(long, help="Viser dagens priser")]
+    idag: bool,
+    #[arg(long, help="Viser morgendagens priser")]
+    imorgen: bool,
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -61,6 +75,10 @@ async fn main() {
         None => panic!("$TIBBER_API_TOKEN is not set")
     };
 
+    let cli = Cli::parse();
+    let show_today = cli.idag == true || cli.idag == false && cli.imorgen == false;
+    let show_tomorrow = cli.imorgen == true;
+
     let price_response = fetch_prices(&token).await;
 
     if price_response.is_some() {
@@ -69,22 +87,44 @@ async fn main() {
         if price.is_some() {
             let price_info = &price.unwrap().current_subscription.price_info;
 
-            println!("  Today (Current price {})", &price_info.current.total);
-            println!("");
 
-            println!(
-                "{}",
-                plot(
-                    price_info.today.clone().iter().map(|p| p.total).collect(),
-                    Config::default()
-                        .with_width(24 * 4)
-                        .with_offset(0) // Where the y-axis starts
-                        .with_height(10),
-                )
-            );
-            // The graph library does not support x-axis, so this is a little hack
-            println!("       ‾|‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾|‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾|‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾|‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾|");
-            println!("       00:00                   06:00                   12:00                   18:00               24:00")
+            if show_today == true {
+                println!("  I dag (Pris nå {})", &price_info.current.total);
+                println!("");
+
+                println!(
+                    "{}",
+                    plot(
+                        price_info.today.clone().iter().map(|p| p.total).collect(),
+                        Config::default()
+                            .with_width(24 * 4)
+                            .with_offset(0) // Where the y-axis starts
+                            .with_height(10),
+                    )
+                );
+                // The graph library does not support x-axis, so this is a little hack
+                println!("       ‾|‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾|‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾|‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾|‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾|");
+                println!("       00:00                   06:00                   12:00                   18:00               24:00")
+            }
+
+            if show_tomorrow == true {
+                println!("  I morgen (Pris nå {})", &price_info.current.total);
+                println!("");
+
+                println!(
+                    "{}",
+                    plot(
+                        price_info.tomorrow.clone().iter().map(|p| p.total).collect(),
+                        Config::default()
+                            .with_width(24 * 4)
+                            .with_offset(0) // Where the y-axis starts
+                            .with_height(10),
+                    )
+                );
+                // The graph library does not support x-axis, so this is a little hack
+                println!("       ‾|‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾|‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾|‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾|‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾|");
+                println!("       00:00                   06:00                   12:00                   18:00               24:00")
+            }
         }
     }
 }
