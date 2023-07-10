@@ -44,4 +44,3 @@ For å vise morgendagens priser:
 ```
 energipriser --imorgen
 ```
-
