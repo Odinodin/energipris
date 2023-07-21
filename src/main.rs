@@ -1,13 +1,13 @@
 use std::env;
+use std::format;
 use std::collections::HashMap;
 use reqwest;
 use reqwest::Response;
 use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize};
 
 use clap::{Parser};
 use rasciigraph::{plot, Config};
-
 
 #[derive(Parser)]
 #[command(name = "energipriser")]
@@ -15,13 +15,13 @@ use rasciigraph::{plot, Config};
 #[command(version = "1.0")]
 #[command(about = "Henter energipriser", long_about = None)]
 struct Cli {
-    #[arg(long, help="Viser dagens priser")]
+    #[arg(long, help = "Viser dagens priser")]
     idag: bool,
-    #[arg(long, help="Viser morgendagens priser")]
+    #[arg(long, help = "Viser morgendagens priser")]
     imorgen: bool,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Price {
     total: f64,
@@ -29,41 +29,36 @@ struct Price {
     starts_at: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize)]
 struct PriceInfo {
     current: Price,
     today: Vec<Price>,
     tomorrow: Vec<Price>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Subscription {
     price_info: PriceInfo,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Home {
     current_subscription: Subscription,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize)]
 struct PriceViewer {
     homes: Vec<Home>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-struct UserViewer {
-    name: String,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize)]
 struct Data<T> {
     viewer: T,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize)]
 struct ApiResponse<T> {
     data: Data<T>,
 }
@@ -87,56 +82,42 @@ async fn main() {
         if price.is_some() {
             let price_info = &price.unwrap().current_subscription.price_info;
 
-
             if show_today == true {
-                println!("  I dag (Pris nå {})", &price_info.current.total);
-                println!("");
-
-                println!(
-                    "{}",
-                    plot(
-                        price_info.today.clone().iter().map(|p| p.total).collect(),
-                        Config::default()
-                            .with_width(24 * 4)
-                            .with_offset(0) // Where the y-axis starts
-                            .with_height(10),
-                    )
-                );
-                // The graph library does not support x-axis, so this is a little hack
-                println!("       ‾|‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾|‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾|‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾|‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾|");
-                println!("       00:00                   06:00                   12:00                   18:00               24:00")
+                print_prices(&format!("  I dag (Pris nå {})", &price_info.current.total), &price_info.today);
             }
-
             if show_tomorrow == true {
-                println!("  I morgen (Pris nå {})", &price_info.current.total);
-                println!("");
-
-                println!(
-                    "{}",
-                    plot(
-                        price_info.tomorrow.clone().iter().map(|p| p.total).collect(),
-                        Config::default()
-                            .with_width(24 * 4)
-                            .with_offset(0) // Where the y-axis starts
-                            .with_height(10),
-                    )
-                );
-                // The graph library does not support x-axis, so this is a little hack
-                println!("       ‾|‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾|‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾|‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾|‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾|");
-                println!("       00:00                   06:00                   12:00                   18:00               24:00")
+                print_prices(&format!("  I morgen (Pris nå {})", &price_info.current.total), &price_info.tomorrow);
             }
         }
     }
 }
 
+fn print_prices(title: &String, prices: &Vec<Price>) -> () {
+    println!("{}", title);
+    println!("");
+
+    println!(
+        "{}",
+        plot(
+            prices.iter().map(|p| p.total).collect(),
+            Config::default()
+                .with_width(24 * 4)
+                .with_offset(0) // Where the y-axis starts
+                .with_height(10),
+        )
+    );
+    // The graph library does not support x-axis, so this is a little hack
+    println!("       ‾|‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾|‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾|‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾|‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾|");
+    println!("       00:00                   06:00                   12:00                   18:00               24:00")
+}
 
 async fn fetch_prices(token: &String) -> Option<ApiResponse<PriceViewer>> {
     let q = "{
   viewer {
     homes {
-      currentSubscription{
-        priceInfo{
-          current{
+      currentSubscription {
+        priceInfo {
+          current {
             total
             energy
             tax
